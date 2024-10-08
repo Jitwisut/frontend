@@ -1,0 +1,25 @@
+{
+  "name": "Backend",
+  "version": "1.0.50",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "bun run --watch src/index.ts"
+  },
+  "dependencies": {
+    "@elysiajs/cookie": "0.7.0",
+    "@elysiajs/cors": "^1.1.1",
+    "@elysiajs/jwt": "^1.1.1",
+    "@elysiajs/lucia-auth": "^1.1.0",
+    "@lucia-auth/adapter-prisma": "^4.0.1",
+    "@lucia-auth/adapter-session-redis": "^2.1.2",
+    "@prisma/client": "^5.19.1",
+    "bcrypt": "^5.1.1",
+    "elysia": "latest",
+    "redis": "^4.7.0"
+  },
+  "devDependencies": {
+    "bun-types": "latest",
+    "prisma": "^5.19.1"
+  },
+  "module": "src/index.ts"
+}
