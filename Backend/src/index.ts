@@ -7,24 +7,33 @@ import { auth4 } from "./authbyme.d";
 import { Connectdb } from "../lib/connect";
 import { Profile } from "./profile/user";
 import { Carts } from "./cars/cars";
+import { Carts2 } from "./cartv2";
 const app = new Elysia();
 //auth3(app)
-app
-  .use(
-    jwt({
-      name: "jwt",
-      secret: process.env.JWT_SECRET!,
-    })
-  )
+const Startsever = async () => {
+  try {
+    app
+      .use(
+        jwt({
+          name: "jwt",
+          secret: process.env.JWT_SECRET!,
+        })
+      )
 
-  .use(cors())
-  //.use(auth3)
-  .use(auth4)
-  .use(Profile)
-  .use(Carts)
-  .get("/", () => "Hello Elysia")
-  .listen(4000);
-
-console.log(
-  `🦊 Elysia is running at ${app.server?.hostname}:${app.server?.port}`
-);
+      .use(cors())
+      //.use(auth3)
+      .use(auth4)
+      .use(Profile)
+      .use(Carts)
+      // .use(Carts2)
+      .get("/", () => "Hello Elysia")
+      .listen(4000, () => {
+        console.log(
+          `🦊 Elysia is running at ${app.server?.hostname}:${app.server?.port}`
+        );
+      });
+  } catch (err) {
+    console.log(err);
+  }
+};
+Startsever();

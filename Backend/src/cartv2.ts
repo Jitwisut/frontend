@@ -3,6 +3,7 @@ import { cookie } from "@elysiajs/cookie";
 import { jwt } from "@elysiajs/jwt";
 import dotenv from "dotenv";
 import redis from "redis";
+import { Connectdb } from "../lib/connect";
 import mongoose from "mongoose";
 import cookies from "cookie";
 
@@ -49,7 +50,7 @@ const Checkauth = (decoded: any, set: any) => {
   }
 };
 
-export const Carts = (app: Elysia) => {
+export const Carts2 = (app: Elysia) => {
   app
     .use(cookie())
 
@@ -100,11 +101,9 @@ export const Carts = (app: Elysia) => {
       }
 
       // ค้นหารถเข็นในฐานข้อมูล
-      const checkcars = await car
-        .findOne({
-          userName: username,
-        })
-        .select("items");
+      const checkcars = await car.findOne({
+        userName: username,
+      });
 
       const exitcars = checkcars?.items.find(
         (item) => item.productId?.toString() === productId.toString()
@@ -187,13 +186,13 @@ export const Carts = (app: Elysia) => {
     // ลบสินค้าในรถเข็น
     .delete("/delete-cars", async ({ body, set, decoded }) => {
       const { productId } = body as { productId: string };
-      if (!decoded) {
-        set.status = 401;
-        return { error: "Unauthorized" };
-      }
       if (!productId) {
         set.status = 400;
         return { error: "Missing required fields" };
+      }
+      if (!decoded) {
+        set.status = 401;
+        return { error: "Unauthorized" };
       }
 
       const beforecars = await car.findOne({
@@ -232,34 +231,6 @@ export const Carts = (app: Elysia) => {
 
       set.status = 200;
       return { message: "You delete Products success" };
-    })
-    .put("/checkout", async ({ body, set, decoded }) => {
-      if (!decoded) {
-        set.status = 401;
-        return { error: "Unauthorized" };
-      }
-
-      const { username } = decoded as { username: string };
-      const Usercart = await car
-        .findOne({ userName: username })
-        .select("items");
-
-      if (!Usercart) {
-        set.status = 404;
-        return { error: "Error not found Cartuser" };
-      }
-
-      let total = 0;
-      const sumtotal = Usercart.items.forEach((item) => {
-        total += item.price! * item.quantity!;
-      });
-      const totalPrice = total.toFixed(2);
-      return {
-        message: "Checkout success",
-        user: username,
-        totalPrice: totalPrice,
-      };
-      //เดี๋ยวมาทำต่อ
     });
 
   return app;

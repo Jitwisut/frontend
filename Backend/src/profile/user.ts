@@ -2,6 +2,7 @@ import cookie from "@elysiajs/cookie";
 import { jwt } from "@elysiajs/jwt";
 import { Elysia } from "elysia";
 import cookies from "cookie";
+import { ConnectionStates, set } from "mongoose";
 
 export const Profile = (app: Elysia) =>
   app.group("/user", (app) =>
@@ -12,8 +13,7 @@ export const Profile = (app: Elysia) =>
           secret: "your-secret-key",
         })
       )
-      .use(cookie())
-      .get("/profile", async ({ set, jwt, request }) => {
+      .derive(async ({ jwt, set, request }) => {
         const Cookieheaders = request.headers.get("cookie") || "";
         const cookieparse = cookies.parse(Cookieheaders);
         const auth = cookieparse.auth;
@@ -27,6 +27,21 @@ export const Profile = (app: Elysia) =>
           return { error: "Invalid token" };
         }
         set.status = 200;
-        return { User: decoded.username, Email: decoded.email };
+        return { decoded };
+      })
+      .use(cookie())
+      .get("/profile", async ({ decoded, set }) => {
+        if (!decoded) {
+          set.status = 401;
+          return { error: "Unauthorized" };
+        }
+        const { username, email } = decoded as {
+          username: string;
+          email: string;
+        };
+        return {
+          User: username,
+          Email: email,
+        };
       })
   );

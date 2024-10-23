@@ -70,7 +70,7 @@ export const auth4 = (app: Elysia) =>
             const user = users.find((u) => u.id === userid);
             return user;
           });
-          app.get("/products", async ({ set, jwt, request }) => {
+          app.get("/products", async ({ set, jwt, request,store }) => {
             try {
               const Cookieheaders = request.headers.get("cookie") || "";
               const cookieparse = cookies.parse(Cookieheaders);
