@@ -6,6 +6,7 @@ import { Connectdb } from "../lib/connect";
 import bcrypt from "bcrypt";
 import User from "../lib/model";
 import dotenv from "dotenv";
+import { set } from "mongoose";
 dotenv.config();
 
 interface RegisterBody {
@@ -70,7 +71,7 @@ export const auth4 = (app: Elysia) =>
             const user = users.find((u) => u.id === userid);
             return user;
           });
-          app.get("/products", async ({ set, jwt, request,store }) => {
+          app.get("/products", async ({ set, jwt, request, store }) => {
             try {
               const Cookieheaders = request.headers.get("cookie") || "";
               const cookieparse = cookies.parse(Cookieheaders);

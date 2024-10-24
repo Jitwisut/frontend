@@ -7,7 +7,7 @@ import { auth4 } from "./authbyme.d";
 import { Connectdb } from "../lib/connect";
 import { Profile } from "./profile/user";
 import { Carts } from "./cars/cars";
-import { Carts2 } from "./cartv2";
+
 const app = new Elysia();
 //auth3(app)
 const Startsever = async () => {
