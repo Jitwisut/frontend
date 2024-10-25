@@ -6,6 +6,11 @@ import { ConnectionStates, set } from "mongoose";
 import User from "../../lib/model";
 import { setRandomSeed } from "bun:jsc";
 
+interface Products {
+  title: string;
+  category: string;
+}
+
 export const Profile = (app: Elysia) =>
   app.group("/user", (app) =>
     app
@@ -106,7 +111,7 @@ export const Profile = (app: Elysia) =>
           const products = await res.json();
 
           // กรองข้อมูลตาม searchQuery และ category (ถ้ามี)
-          const filteredProducts = products.filter((product) => {
+          const filteredProducts = products.filter((product: Products) => {
             const matchesQuery = searchQuery
               ? product.title.toLowerCase().includes(searchQuery.toLowerCase())
               : true;
@@ -121,12 +126,12 @@ export const Profile = (app: Elysia) =>
           return {
             products: filteredProducts,
           };
-        } catch (error) {
+        } catch (err) {
           // จัดการข้อผิดพลาดและส่งข้อความแจ้งเตือน
-          console.error("Error fetching products:", error);
+          console.error("Error fetching products:", err);
           return {
             error: "Failed to fetch products",
-            message: error.message,
+            message: (err as Error).message,
           };
         }
       })

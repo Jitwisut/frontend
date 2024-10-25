@@ -19,7 +19,6 @@ const Startsever = async () => {
           secret: process.env.JWT_SECRET!,
         })
       )
-
       .use(cors())
       //.use(auth3)
       .use(auth4)
@@ -35,5 +34,7 @@ const Startsever = async () => {
   } catch (err) {
     console.log(err);
   }
+  await Connectdb();
 };
+
 Startsever();

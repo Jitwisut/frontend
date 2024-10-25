@@ -260,6 +260,7 @@ export const Carts = (app: Elysia) => {
         totalPrice: totalPrice,
       };
       //เดี๋ยวมาทำต่อ
+      //จะต้องทำเลข orderidด้วย PostgreSQL
     });
 
   return app;

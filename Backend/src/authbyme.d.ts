@@ -151,7 +151,7 @@ export const auth4 = (app: Elysia) =>
               "Password must contain at least two special characters (!@#$%^&*) and be at least 6 characters long.",
           };
         }
-        await Connectdb();
+
         const checkuser = await User.findOne({ email });
         if (checkuser) {
           set.status = 400;
@@ -191,7 +191,7 @@ export const auth4 = (app: Elysia) =>
         }
         const sanitizedUsername = username.trim();
         const sanitizedPassword = password.trim();
-        await Connectdb();
+
         const user = await User.findOne(
           { username: sanitizedUsername },
           //สำคัญตรงนี้ไว้กำหนดมาให้ Database แสดงข้อมูลอะไรของuserบ้าง
