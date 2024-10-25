@@ -46,12 +46,13 @@ export const Profile = (app: Elysia) =>
           Email: email,
         };
       })
-      .post("/update-email", async ({ set, decoded, body }) => {
+      .post("/update-email", async ({ set, decoded, body, query }) => {
         try {
           if (!decoded) {
             set.status = 401;
             return { error: "Unauthorized" };
           }
+
           const { username } = decoded as { username: string };
           const { newEmail } = body as { newEmail: string };
           if (!newEmail) {
@@ -87,6 +88,46 @@ export const Profile = (app: Elysia) =>
         } catch (err) {
           set.status = 500;
           return { error: "Error Serverruning" };
+        }
+      })
+      .get("/api/search", async ({ query }) => {
+        const { query: searchQuery, category } = query;
+
+        try {
+          // ดึงข้อมูลสินค้าจาก API ภายนอก
+          const res = await fetch("https://fakestoreapi.com/products");
+
+          // ตรวจสอบสถานะของการตอบสนอง (Response Status)
+          if (!res.ok) {
+            throw new Error(`HTTP error! status: ${res.status}`);
+          }
+
+          // แปลงผลลัพธ์เป็น JSON
+          const products = await res.json();
+
+          // กรองข้อมูลตาม searchQuery และ category (ถ้ามี)
+          const filteredProducts = products.filter((product) => {
+            const matchesQuery = searchQuery
+              ? product.title.toLowerCase().includes(searchQuery.toLowerCase())
+              : true;
+            const matchesCategory = category
+              ? product.category.toLowerCase() === category.toLowerCase()
+              : true;
+
+            return matchesQuery && matchesCategory;
+          });
+
+          // ส่งผลลัพธ์ที่กรองกลับไปยังผู้ใช้
+          return {
+            products: filteredProducts,
+          };
+        } catch (error) {
+          // จัดการข้อผิดพลาดและส่งข้อความแจ้งเตือน
+          console.error("Error fetching products:", error);
+          return {
+            error: "Failed to fetch products",
+            message: error.message,
+          };
         }
       })
   );
