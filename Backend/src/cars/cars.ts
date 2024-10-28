@@ -234,7 +234,9 @@ export const Carts = (app: Elysia) => {
       return { message: "You delete Products success" };
     })
     .post("/checkout", async ({ body, set, decoded }) => {
+      // สมมติว่า `client` คือ PostgreSQL client และ `cart` คือ MongoDB collection
       try {
+        // 1. ตรวจสอบการยืนยันตัวตน
         if (!decoded) {
           set.status = 401;
           return { error: "Unauthorized" };
@@ -242,42 +244,86 @@ export const Carts = (app: Elysia) => {
 
         const { username } = decoded as { username: string };
 
-        const Usercart = await car
+        if (!username) {
+          set.status = 400;
+          return { error: "Invalid token: username missing" };
+        }
+
+        // 2. ดึงข้อมูลรถเข็นของผู้ใช้จาก MongoDB
+        const userCart = await car
           .findOne({ userName: username })
           .select("items");
 
-        if (!Usercart) {
+        if (!userCart) {
           set.status = 404;
-          return { error: "Error not found Cartuser" };
+          return { error: "Cart not found for the user" };
         }
 
-        let total = 0;
-        const sumtotal = Usercart.items.forEach((item) => {
-          total += item.price! * item.quantity!;
-        });
-        const totalPrice = total.toFixed(2);
+        if (!Array.isArray(userCart.items) || userCart.items.length === 0) {
+          set.status = 400;
+          return { error: "Cart is empty" };
+        }
 
-        //เดี๋ยวมาทำต่อ
-        //จะต้องทำเลข orderidด้วย PostgreSQL
-        const createOrderQuery = `
-        INSERT INTO orders (customer_id, status, total_amount)
-        VALUES ($1, $2, $3) RETURNING orderid;
-      `;
-        const result = await clients.query(createOrderQuery, [
-          username,
-          "pending",
-          totalPrice,
-        ]);
-        const orderid = result.rows[0].orderid; // ดึง orderid จากผลลัพธ์
+        // 3. คำนวณราคาทั้งหมด
+        const total = userCart.items.reduce((accumulator, item) => {
+          if (!item.price || !item.quantity) {
+            throw new Error("Invalid item data");
+          }
+          return accumulator + item.price * item.quantity;
+        }, 0);
 
-        return {
-          message: "Checkout success",
-          user: username,
-          totalPrice: totalPrice,
-          orderID: orderid,
-        };
+        const totalPrice = parseFloat(total.toFixed(2)); // ทำให้เป็นตัวเลข
+
+        // 4. เริ่มต้นธุรกรรม PostgreSQL
+        await clients.query("BEGIN");
+
+        try {
+          // 4.1 แทรกคำสั่งซื้อใน PostgreSQL
+          const createOrderQuery = `
+            INSERT INTO orders (customer_id, status, total_amount)
+            VALUES ($1, $2, $3) RETURNING orderid;
+          `;
+          const result = await clients.query(createOrderQuery, [
+            username,
+            "pending",
+            totalPrice,
+          ]);
+
+          if (result.rows.length === 0) {
+            throw new Error("Failed to create order");
+          }
+
+          const orderId = result.rows[0].orderid;
+
+          // 4.2 ล้างรถเข็นใน MongoDB
+          const clearCartResult = await car.updateOne(
+            { userName: username },
+            { $set: { items: [] } } // หรือใช้ $unset เพื่อลบฟิลด์ 'items' หากต้องการ
+          );
+
+          if (clearCartResult.modifiedCount === 0) {
+            throw new Error("Failed to clear cart");
+          }
+
+          // 4.3 ยืนยันธุรกรรม PostgreSQL
+          await clients.query("COMMIT");
+
+          // 5. ส่งคืนการตอบสนองสำเร็จ
+          return {
+            message: "Checkout success",
+            user: username,
+            totalPrice: totalPrice,
+            orderID: orderId,
+          };
+        } catch (error) {
+          // 6. ยกเลิกธุรกรรม PostgreSQL ในกรณีเกิดข้อผิดพลาด
+          await clients.query("ROLLBACK");
+          throw error; // ส่งต่อข้อผิดพลาดไปยัง catch ภายนอก
+        }
       } catch (err) {
-        console.log("Error:", err);
+        console.error("Error:", err);
+        set.status = 500;
+        return { error: "Internal Server Error" };
       }
     });
 
