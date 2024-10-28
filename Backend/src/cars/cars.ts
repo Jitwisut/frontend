@@ -233,7 +233,7 @@ export const Carts = (app: Elysia) => {
       set.status = 200;
       return { message: "You delete Products success" };
     })
-    .put("/checkout", async ({ body, set, decoded }) => {
+    .post("/checkout", async ({ body, set, decoded }) => {
       if (!decoded) {
         set.status = 401;
         return { error: "Unauthorized" };
