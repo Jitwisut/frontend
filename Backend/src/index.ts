@@ -7,6 +7,7 @@ import { auth4 } from "./authbyme.d";
 import { Connectdb } from "../lib/connect";
 import { Profile } from "./profile/user";
 import { Carts } from "./cars/cars";
+import { Connectsql } from "../libsql/connect";
 
 const app = new Elysia();
 //auth3(app)
@@ -35,6 +36,7 @@ const Startsever = async () => {
     console.log(err);
   }
   await Connectdb();
+  await Connectsql();
 };
 
 Startsever();

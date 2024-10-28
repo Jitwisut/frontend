@@ -5,7 +5,7 @@ import dotenv from "dotenv";
 import redis from "redis";
 import mongoose from "mongoose";
 import cookies from "cookie";
-
+import { clients } from "../../libsql/connect";
 dotenv.config();
 
 // กำหนดประเภทข้อมูลสำหรับ store
@@ -234,33 +234,51 @@ export const Carts = (app: Elysia) => {
       return { message: "You delete Products success" };
     })
     .post("/checkout", async ({ body, set, decoded }) => {
-      if (!decoded) {
-        set.status = 401;
-        return { error: "Unauthorized" };
+      try {
+        if (!decoded) {
+          set.status = 401;
+          return { error: "Unauthorized" };
+        }
+
+        const { username } = decoded as { username: string };
+
+        const Usercart = await car
+          .findOne({ userName: username })
+          .select("items");
+
+        if (!Usercart) {
+          set.status = 404;
+          return { error: "Error not found Cartuser" };
+        }
+
+        let total = 0;
+        const sumtotal = Usercart.items.forEach((item) => {
+          total += item.price! * item.quantity!;
+        });
+        const totalPrice = total.toFixed(2);
+
+        //เดี๋ยวมาทำต่อ
+        //จะต้องทำเลข orderidด้วย PostgreSQL
+        const createOrderQuery = `
+        INSERT INTO orders (customer_id, status, total_amount)
+        VALUES ($1, $2, $3) RETURNING orderid;
+      `;
+        const result = await clients.query(createOrderQuery, [
+          username,
+          "pending",
+          totalPrice,
+        ]);
+        const orderid = result.rows[0].orderid; // ดึง orderid จากผลลัพธ์
+
+        return {
+          message: "Checkout success",
+          user: username,
+          totalPrice: totalPrice,
+          orderID: orderid,
+        };
+      } catch (err) {
+        console.log("Error:", err);
       }
-
-      const { username } = decoded as { username: string };
-      const Usercart = await car
-        .findOne({ userName: username })
-        .select("items");
-
-      if (!Usercart) {
-        set.status = 404;
-        return { error: "Error not found Cartuser" };
-      }
-
-      let total = 0;
-      const sumtotal = Usercart.items.forEach((item) => {
-        total += item.price! * item.quantity!;
-      });
-      const totalPrice = total.toFixed(2);
-      return {
-        message: "Checkout success",
-        user: username,
-        totalPrice: totalPrice,
-      };
-      //เดี๋ยวมาทำต่อ
-      //จะต้องทำเลข orderidด้วย PostgreSQL
     });
 
   return app;

@@ -1,6 +1,7 @@
 import pg from "pg";
 import dotenv from "dotenv";
 dotenv.config();
+
 const client = pg;
 
 const clients = new client.Client({
@@ -11,26 +12,15 @@ const clients = new client.Client({
   port: 5432,
 });
 
-async function createOrdersTable() {
-  const createTableQuery = `
-        CREATE TABLE IF NOT EXISTS orders (
-            orderid SERIAL PRIMARY KEY,
-            customer_id INT NOT NULL,
-            order_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            status VARCHAR(50) NOT NULL,
-            total_amount DECIMAL(10, 2) NOT NULL
-        );
-    `;
+async function Connectsql() {
+  // เช็คว่ามีการเชื่อมต่ออยู่หรือไม่
   try {
     await clients.connect();
-    const res = await clients.query("SELECT version();");
-    console.log("คุณเชื่อมต่อกับฐานข้อมูล:", res.rows[0]);
+    console.log("คุณเชื่อมต่อกับฐานข้อมูลสำเร็จ.");
   } catch (err) {
-    console.log("Error", err);
-  } finally {
-    await clients.end();
+    console.error("Error connecting to database:", err);
+    throw err;
   }
 }
-export default createOrdersTable();
-// ยังไม่สมบูรณ์ เพราะยังไม่ได้เชื่อมกับ server
-// เดี๋ยวมาทำต่ออีกไอสัสกูท้อแทร่
+
+export { Connectsql, clients }; // ส่งออก client และฟังก์ชันเชื่อมต่อ
