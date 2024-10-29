@@ -7,6 +7,7 @@ import bcrypt from "bcrypt";
 import User from "../lib/model";
 import dotenv from "dotenv";
 import { set } from "mongoose";
+import swagger from "@elysiajs/swagger";
 dotenv.config();
 
 interface RegisterBody {
@@ -32,6 +33,7 @@ interface DecodedToken {
 export const auth4 = (app: Elysia) =>
   app.group("/auth", (app) => {
     app
+      .use(swagger())
       .use(
         jwt({
           name: "jwt",
@@ -273,8 +275,8 @@ export const auth4 = (app: Elysia) =>
         });
         set.status = 200;
         return { message: "You Signout Success" };
-      })
-      .get("/storage", ({ jwt, set }) => {});
+      });
+
     return app;
   });
 export default auth4;

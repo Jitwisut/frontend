@@ -5,7 +5,7 @@ import cookies from "cookie";
 import { ConnectionStates, set } from "mongoose";
 import User from "../../lib/model";
 import { setRandomSeed } from "bun:jsc";
-
+import swagger from "@elysiajs/swagger";
 interface Products {
   title: string;
   category: string;
@@ -14,6 +14,7 @@ interface Products {
 export const Profile = (app: Elysia) =>
   app.group("/user", (app) =>
     app
+      .use(swagger())
       .use(
         jwt({
           name: "jwt",

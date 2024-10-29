@@ -8,24 +8,26 @@ import { Connectdb } from "../lib/connect";
 import { Profile } from "./profile/user";
 import { Carts } from "./cars/cars";
 import { Connectsql } from "../libsql/connect";
-
+import swagger from "@elysiajs/swagger";
 const app = new Elysia();
 //auth3(app)
 const Startsever = async () => {
   try {
     app
+      .use(swagger())
       .use(
         jwt({
           name: "jwt",
           secret: process.env.JWT_SECRET!,
         })
       )
+
       .use(cors())
       //.use(auth3)
       .use(auth4)
       .use(Profile)
       .use(Carts)
-      // .use(Carts2)
+
       .get("/", () => "Hello Elysia")
       .listen(4000, () => {
         console.log(
