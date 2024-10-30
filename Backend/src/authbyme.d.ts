@@ -261,8 +261,12 @@ export const auth4 = (app: Elysia) =>
             secure: true,
           },
         };
+
         console.log("user:", user);
-        return { message: "Login successful", user };
+        return {
+          message: "Login successful",
+          user,
+        };
       })
       .put("/sign-out", ({ set }) => {
         //ทำให้cookieเป็นว่าง

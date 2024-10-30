@@ -6,6 +6,7 @@ import redis from "redis";
 import mongoose from "mongoose";
 import cookies from "cookie";
 import swagger from "@elysiajs/swagger";
+import { clients } from "../../libsql/connect";
 dotenv.config();
 
 // กำหนดประเภทข้อมูลสำหรับ store
@@ -46,7 +47,7 @@ export const Carts = (app: Elysia) =>
   app.group("/api", (app) =>
     app
       // เริ่มต้น Swagger สำหรับเส้นทางในกลุ่ม /api เท่านั้น
-      .use(swagger({ provider: "swagger-ui" }))
+      .use(swagger())
 
       // ใช้ cookie และ jwt หลังจาก Swagger
       .use(cookie())
@@ -230,6 +231,121 @@ export const Carts = (app: Elysia) =>
 
         set.status = 200;
         return { message: "You delete Products success" };
+      })
+      .post("/checkout", async ({ body, set, decoded }) => {
+        // สมมติว่า `client` คือ PostgreSQL client และ `cart` คือ MongoDB collection
+        try {
+          // 1. ตรวจสอบการยืนยันตัวตน
+          if (!decoded) {
+            set.status = 401;
+            return { error: "Unauthorized" };
+          }
+
+          const { username } = decoded as { username: string };
+
+          if (!username) {
+            set.status = 400;
+            return { error: "Invalid token: username missing" };
+          }
+
+          // 2. ดึงข้อมูลรถเข็นของผู้ใช้จาก MongoDB
+          const userCart = await car
+            .findOne({ userName: username })
+            .select("items");
+
+          if (!userCart) {
+            set.status = 404;
+            return { error: "Cart not found for the user" };
+          }
+
+          if (!Array.isArray(userCart.items) || userCart.items.length === 0) {
+            set.status = 400;
+            return { error: "Cart is empty" };
+          }
+
+          // 3. คำนวณราคาทั้งหมด
+          const total = userCart.items.reduce((accumulator, item) => {
+            if (!item.price || !item.quantity) {
+              throw new Error("Invalid item data");
+            }
+            return accumulator + item.price * item.quantity;
+          }, 0);
+
+          const totalPrice = parseFloat(total.toFixed(2)); // ทำให้เป็นตัวเลข
+
+          // 4. เริ่มต้นธุรกรรม PostgreSQL
+          await clients.query("BEGIN");
+
+          try {
+            // 4.1 แทรกคำสั่งซื้อใน PostgreSQL
+            const createOrderQuery = `
+              INSERT INTO orders (customer_id, status, total_amount)
+              VALUES ($1, $2, $3) RETURNING orderid;
+            `;
+            const result = await clients.query(createOrderQuery, [
+              username,
+              "pending",
+              totalPrice,
+            ]);
+
+            if (result.rows.length === 0) {
+              throw new Error("Failed to create order");
+            }
+
+            const orderId = result.rows[0].orderid;
+
+            // 4.2 ล้างรถเข็นใน MongoDB
+            const clearCartResult = await car.updateOne(
+              { userName: username },
+              { $set: { items: [] } } // หรือใช้ $unset เพื่อลบฟิลด์ 'items' หากต้องการ
+            );
+
+            if (clearCartResult.modifiedCount === 0) {
+              throw new Error("Failed to clear cart");
+            }
+
+            // 4.3 ยืนยันธุรกรรม PostgreSQL
+            await clients.query("COMMIT");
+
+            // 5. ส่งคืนการตอบสนองสำเร็จ
+            return {
+              message: "Checkout success",
+              user: username,
+              totalPrice: totalPrice,
+              orderID: orderId,
+            };
+          } catch (error) {
+            // 6. ยกเลิกธุรกรรม PostgreSQL ในกรณีเกิดข้อผิดพลาด
+            await clients.query("ROLLBACK");
+            throw error; // ส่งต่อข้อผิดพลาดไปยัง catch ภายนอก
+          }
+        } catch (err) {
+          console.error("Error:", err);
+          set.status = 500;
+          return { error: "Internal Server Error" };
+        }
+      })
+      .get("/orders/:id/status", async ({ set, decoded, params }) => {
+        const { id } = params as { id: string };
+        if (!decoded) {
+          set.status = 401;
+          return { error: "Unauthorized" };
+        }
+
+        const order = await clients.query(
+          "SELECT status,orderid,customer_id,total_amount FROM orders WHERE orderid=$1",
+          [id]
+        );
+        if (!order) {
+          set.status = 400;
+          return { error: "Order not found" };
+        }
+        return {
+          status: order.rows[0].status,
+          user: order.rows[0].customer_id,
+          total: order.rows[0].total_amount,
+        }; // ส่งคืนสถานะของคำสั่งซื้อ
+        //เดี๋ยวมาทำต่อ เพิ่มสถานะการจัดส่ง และ เพิ่มสถานะการชำระเงิน และ เพิ่มสถานะการยกเลิกคำสั่งซื้อ เพิ่ม  handle error
       })
   );
 
