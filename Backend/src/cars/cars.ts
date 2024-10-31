@@ -1,4 +1,4 @@
-import { Elysia } from "elysia";
+import { Elysia, error } from "elysia";
 import { cookie } from "@elysiajs/cookie";
 import { jwt } from "@elysiajs/jwt";
 import dotenv from "dotenv";
@@ -326,25 +326,29 @@ export const Carts = (app: Elysia) =>
         }
       })
       .get("/orders/:id/status", async ({ set, decoded, params }) => {
-        const { id } = params as { id: string };
-        if (!decoded) {
-          set.status = 401;
-          return { error: "Unauthorized" };
+        try {
+          const { id } = params as { id: string };
+          if (!decoded) {
+            set.status = 401;
+            return { error: "Unauthorized" };
+          }
+          const order = await clients.query(
+            "SELECT status,orderid,customer_id,total_amount FROM orders WHERE orderid=$1",
+            [id]
+          );
+          if (!order) {
+            set.status = 400;
+            return { error: "Order not found" };
+          }
+          return {
+            status: order.rows[0].status,
+            user: order.rows[0].customer_id,
+            total: order.rows[0].total_amount,
+          }; // ส่งคืนสถานะของคำสั่งซื้อ
+        } catch (err: unknown) {
+          set.status = 500;
+          return { Error: err as Error };
         }
-
-        const order = await clients.query(
-          "SELECT status,orderid,customer_id,total_amount FROM orders WHERE orderid=$1",
-          [id]
-        );
-        if (!order) {
-          set.status = 400;
-          return { error: "Order not found" };
-        }
-        return {
-          status: order.rows[0].status,
-          user: order.rows[0].customer_id,
-          total: order.rows[0].total_amount,
-        }; // ส่งคืนสถานะของคำสั่งซื้อ
         //เดี๋ยวมาทำต่อ เพิ่มสถานะการจัดส่ง และ เพิ่มสถานะการชำระเงิน และ เพิ่มสถานะการยกเลิกคำสั่งซื้อ เพิ่ม  handle error
       })
   );
