@@ -1,9 +1,9 @@
-import { Elysia, error } from "elysia";
+import { cloneInference, Elysia, error } from "elysia";
 import { cookie } from "@elysiajs/cookie";
 import { jwt } from "@elysiajs/jwt";
 import dotenv from "dotenv";
 import redis from "redis";
-import mongoose from "mongoose";
+import mongoose, { set } from "mongoose";
 import cookies from "cookie";
 import swagger from "@elysiajs/swagger";
 import { clients } from "../../libsql/connect";
@@ -313,6 +313,7 @@ export const Carts = (app: Elysia) =>
               user: username,
               totalPrice: totalPrice,
               orderID: orderId,
+              peoducts: userCart.items,
             };
           } catch (error) {
             // 6. ยกเลิกธุรกรรม PostgreSQL ในกรณีเกิดข้อผิดพลาด
@@ -325,32 +326,85 @@ export const Carts = (app: Elysia) =>
           return { error: "Internal Server Error" };
         }
       })
-      .get("/orders/:id/status", async ({ set, decoded, params }) => {
-        try {
-          const { id } = params as { id: string };
-          if (!decoded) {
-            set.status = 401;
-            return { error: "Unauthorized" };
-          }
-          const order = await clients.query(
-            "SELECT status,orderid,customer_id,total_amount FROM orders WHERE orderid=$1",
-            [id]
-          );
-          if (!order) {
-            set.status = 400;
-            return { error: "Order not found" };
-          }
-          return {
-            status: order.rows[0].status,
-            user: order.rows[0].customer_id,
-            total: order.rows[0].total_amount,
-          }; // ส่งคืนสถานะของคำสั่งซื้อ
-        } catch (err: unknown) {
-          set.status = 500;
-          return { Error: err as Error };
-        }
-        //เดี๋ยวมาทำต่อ เพิ่มสถานะการจัดส่ง และ เพิ่มสถานะการชำระเงิน และ เพิ่มสถานะการยกเลิกคำสั่งซื้อ เพิ่ม  handle error
-      })
+      .group("/orders/:id", (order) =>
+        order
+          .get("/status", async ({ set, decoded, params }) => {
+            try {
+              const { id } = params as { id: string };
+              if (!decoded) {
+                set.status = 401;
+                return { error: "Unauthorized" };
+              }
+              const order = await clients.query(
+                "SELECT status,orderid,customer_id,total_amount FROM orders WHERE orderid=$1",
+                [id]
+              );
+              if (!order) {
+                set.status = 400;
+                return { error: "Order not found" };
+              }
+              return {
+                status: order.rows[0].status,
+                user: order.rows[0].customer_id,
+                total: order.rows[0].total_amount,
+              }; // ส่งคืนสถานะของคำสั่งซื้อ
+            } catch (err: unknown) {
+              set.status = 500;
+              return { Error: err as Error };
+            }
+            //เดี๋ยวมาทำต่อ เพิ่มสถานะการจัดส่ง และ เพิ่มสถานะการชำระเงิน และ เพิ่มสถานะการยกเลิกคำสั่งซื้อ เพิ่ม  handle error
+          })
+          .post("/cancel", async ({ set, decoded, params }) => {
+            try {
+              if (!decoded) {
+                set.status = 400; // แก้ไขจาก set.status = 400;
+                return { Error: "Unauthorized" };
+              }
+
+              const { id } = params as { id: string }; // ดึง orderId จากพารามิเตอร์ URL
+              if (!/^\d+$/.test(id)) {
+                // ตรวจสอบว่า id เป็นตัวเลข
+                set.status = 400;
+                return { Error: "Invalid order ID format" };
+              }
+              const order = await clients.query(
+                `SELECT * FROM orders WHERE orderid=$1`,
+                [id]
+              );
+              if (!order.rows[0]) {
+                // ตรวจสอบว่ามีคำสั่งซื้อนี้ในระบบหรือไม่
+                set.status = 404;
+                return { Error: `Order with ID ${id} not found` };
+              }
+              const query = `UPDATE orders SET status = 'Cancelled' WHERE orderid = $1 RETURNING *`; // อัปเดตสถานะคำสั่งซื้อเป็น "Cancelled" โดยใช้ orderId
+              const connect = await clients.query(query, [id]); // ดำเนินการคำสั่ง SQL ด้วยพารามิเตอร์ orderId
+              return {
+                message: "Order cancelled successfully",
+                order: connect.rows[0], // ส่งคืนข้อมูลคำสั่งซื้อที่ถูกยกเลิก
+              };
+            } catch (err: unknown) {
+              console.log("Error:", (err as Error).message); // ปรับการแสดง error message ให้ชัดเจน
+              return { Error: (err as Error).message };
+            }
+          })
+          .post("/upstatus", async ({ set, decoded, params }) => {
+            try {
+              if (!decoded) {
+                set.status = 401;
+                return { Error: "Unauthorized" };
+              }
+              const { id } = params as { id: string };
+              const query = `UPDATE orders SET status = 'Delivered' WHERE orderid = $1 RETURNING *`;
+              const connect = await clients.query(query, [id]); // ดำเนินการคำสั่ง SQL ด้วยพารามิเตอร์ orderId
+              return {
+                message: "Order status updated successfully",
+                order: connect.rows[0],
+              }; // ส่งคืนข้อมูลคำสั่งซื้อที่ถูกอัปเดตสถานะ
+            } catch (err: unknown) {
+              return { error: (err as Error).message };
+            }
+          })
+      )
   );
 
 export default Carts;
