@@ -3,7 +3,7 @@ import { Elysia, t } from "elysia";
 import { cors } from "@elysiajs/cors";
 import { jwt } from "@elysiajs/jwt";
 import { auth3 } from "./auth2";
-import { auth4 } from "./authbyme.d";
+import { auth4 } from "./authbyme";
 import { Connectdb } from "../lib/connect";
 import { Profile } from "./profile/user";
 import { Carts } from "./cars/cars";

@@ -59,10 +59,8 @@ export const Carts = (app: Elysia) =>
       )
 
       // Middleware สำหรับตรวจสอบ JWT
-      .derive(async ({ request, set, jwt }) => {
-        const Cookieheaders = request.headers.get("cookie") || "";
-        const cookieparse = cookies.parse(Cookieheaders);
-        const auth = cookieparse.auth;
+      .derive(async ({ request, set, jwt, cookie }) => {
+        const auth = cookie.auth.value;
 
         if (!auth) {
           set.status = 401;
@@ -160,6 +158,7 @@ export const Carts = (app: Elysia) =>
           return {
             message: "Get cart success (from cache)",
             items: JSON.parse(cachedCart).items.length,
+            User: username,
           };
         }
 
@@ -173,14 +172,18 @@ export const Carts = (app: Elysia) =>
           items = checkcars.items.length;
 
           // เก็บข้อมูลลงใน Redis Cache เพื่อใช้ในครั้งถัดไป
-          await redisClient.setEx(
-            `cart:${username}`,
-            3600,
-            JSON.stringify(checkcars)
-          ); // เก็บ 1 ชั่วโมง
+          if (username && checkcars) {
+            await redisClient.setEx(
+              `cart:${username}`,
+              3600,
+              JSON.stringify(checkcars)
+            );
+          } else {
+            console.log("Username or checkcars is missing.");
+          }
         }
 
-        return { message: "Get cart success", items };
+        return { message: "Get cart success", items, User: username };
       })
 
       // ลบสินค้าในรถเข็น

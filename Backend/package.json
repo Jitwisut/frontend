@@ -12,10 +12,10 @@
     "@elysiajs/lucia-auth": "^1.1.0",
     "@elysiajs/swagger": "^1.1.5",
     "@lucia-auth/adapter-prisma": "^4.0.1",
-    "@lucia-auth/adapter-session-redis": "^2.1.2",
     "@prisma/client": "^5.19.1",
     "bcrypt": "^5.1.1",
-    "elysia": "latest",
+    "elysia": "^1.1.24",
+    "nodemailer": "^6.9.16",
     "redis": "^4.7.0",
     "session": "^0.1.0"
   },
