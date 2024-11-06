@@ -1,4 +1,4 @@
-import { cloneInference, Elysia, error } from "elysia";
+import { Elysia, error, t } from "elysia";
 import { cookie } from "@elysiajs/cookie";
 import { jwt } from "@elysiajs/jwt";
 import dotenv from "dotenv";
@@ -158,6 +158,7 @@ export const Carts = (app: Elysia) =>
           return {
             message: "Get cart success (from cache)",
             items: JSON.parse(cachedCart).items.length,
+            Listitems: JSON.parse(cachedCart).items,
             User: username,
           };
         }
@@ -182,8 +183,13 @@ export const Carts = (app: Elysia) =>
             console.log("Username or checkcars is missing.");
           }
         }
-
-        return { message: "Get cart success", items, User: username };
+        const Listitems = await checkcars?.items;
+        return {
+          message: "Get cart success",
+          items,
+          Listitems: Listitems,
+          User: username,
+        };
       })
 
       // ลบสินค้าในรถเข็น
@@ -338,13 +344,21 @@ export const Carts = (app: Elysia) =>
                 set.status = 401;
                 return { error: "Unauthorized" };
               }
+              const checkorder = await clients.query(
+                "SELECT * FROM orders WHERE orderid = $1",
+                [id]
+              );
+              if (!checkorder.rows[0]) {
+                set.status = 404;
+                return { error: "Order not found" };
+              }
               const order = await clients.query(
                 "SELECT status,orderid,customer_id,total_amount FROM orders WHERE orderid=$1",
                 [id]
               );
               if (!order) {
                 set.status = 400;
-                return { error: "Order not found" };
+                return { error: "Error order please try again" };
               }
               return {
                 status: order.rows[0].status,
