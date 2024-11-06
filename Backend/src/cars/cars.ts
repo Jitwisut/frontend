@@ -335,6 +335,7 @@ export const Carts = (app: Elysia) =>
           return { error: "Internal Server Error" };
         }
       })
+
       .group("/orders/:id", (order) =>
         order
           .get("/status", async ({ set, decoded, params }) => {
@@ -422,6 +423,43 @@ export const Carts = (app: Elysia) =>
             }
           })
       )
+      .get("/orders", async ({ set, decoded, body }) => {
+        if (!decoded) {
+          set.status = 400;
+          return { error: "Unauthorized" };
+        }
+        const { username } = decoded as { username: string };
+
+        try {
+          const cacheorder = await redisClient.get(`orders:${username}`); // ดึงข้อมูลคำสั่งซื้อจาก Redis โดยใช้ username เป็น key
+          if (cacheorder) {
+            set.status = 200;
+            return {
+              message: "Orders retrieved successfully (from cache)",
+              orders: JSON.parse(cacheorder), // ส่งคืนข้อมูลคำสั่งซื้อจาก Redis (ถ้ามีใน cache)referto the cache order
+            };
+          }
+          const orders = await clients.query(
+            `SELECT * FROM orders WHERE customer_id = $1`,
+            [username]
+          ); // ดึงข้อมูลคำสั่งซื้อจากฐานข้อมูลโดยใช้ username เป็นเงื่อนไขการค้นหาreferto the database order
+          if (orders.rows.length === 0) {
+            set.status = 404;
+            return { message: "No orders found for this user" };
+          }
+          await redisClient.setEx(
+            `orders:${username}`,
+            3600,
+            JSON.stringify(orders.rows)
+          ); // เก็บข้อมูลคำสั่งซื้อลงใน Redis พร้อมกำหนดเวลาหมดอายุ (1 ชั่วโมง)referto the cache order
+          return {
+            message: "Search Order successfully",
+            order: orders.rows,
+          };
+        } catch (err) {
+          console.log("Error:", (err as Error).message); // ปรับการแสดง error message ให้ชัดเจน
+        }
+      })
   );
 
 export default Carts;
