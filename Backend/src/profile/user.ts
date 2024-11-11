@@ -9,6 +9,10 @@ import swagger from "@elysiajs/swagger";
 interface Products {
   title: string;
   category: string;
+  rating: {
+    rate: number;
+    count: number;
+  };
 }
 
 export const Profile = (app: Elysia) =>
@@ -141,6 +145,28 @@ export const Profile = (app: Elysia) =>
             error: "Failed to fetch products",
             message: (err as Error).message,
           };
+        }
+      })
+      .get("/api/products/trending", async ({ set }) => {
+        try {
+          const res = await fetch("https://fakestoreapi.com/products");
+          if (!res.ok) {
+            throw new Error(`HTTP error! status: ${res.status}`);
+          }
+          const products = await res.json();
+          const trendingProducts = products
+            .filter(
+              (product: Products) => product.rating && product.rating.rate >= 3
+            )
+            .sort((a: Products, b: Products) => b.rating.rate - a.rating.rate)
+            .slice(0, 10); // เลือกแสดงแค่ 5 รายการที่ได้รับความนิยมสูงสุด
+          set.status = 200;
+          return {
+            message: "Successfully fetched trending products",
+            products: trendingProducts,
+          };
+        } catch (err) {
+          return { Error: (err as Error).message };
         }
       })
   );
