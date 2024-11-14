@@ -158,10 +158,15 @@ export const auth4 = (app: Elysia) =>
             };
           }
 
-          const checkuser = await User.findOne({ email });
-          if (checkuser) {
+          const checkemail = await User.findOne({ email });
+          if (checkemail) {
             set.status = 400;
             return { error: "Error email already in use" };
+          }
+          const exituser = await User.findOne({ username });
+          if (exituser) {
+            set.status = 400;
+            return { error: "Error username already in use" };
           }
 
           const hashpass = await bcrypt.hash(password, 10);
