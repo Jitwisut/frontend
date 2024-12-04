@@ -9,6 +9,7 @@ import { Profile } from "./profile/user";
 import { Carts } from "./cars/cars";
 import { Connectsql } from "../libsql/connect";
 import swagger from "@elysiajs/swagger";
+import { User } from "../libsql2/user";
 const app = new Elysia();
 //auth3(app)
 const Startsever = async () => {
@@ -138,6 +139,7 @@ const Startsever = async () => {
 
       .use(cors())
       //.use(auth3)
+      .use(User)
       .use(auth4)
       .use(Profile)
       .use(Carts)

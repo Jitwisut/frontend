@@ -2,7 +2,6 @@ import { Elysia } from "elysia";
 import crypto from "crypto";
 import bcrypt from "bcrypt";
 import User from "../lib/model"; // โมเดลของผู้ใช้
-import nodemailer from "nodemailer"; // ใช้สำหรับส่งอีเมล
 
 export const ResetPassword = (app: Elysia) =>
   app.group("/user", (app) =>
@@ -32,22 +31,6 @@ export const ResetPassword = (app: Elysia) =>
           user.passwordResetToken = hashedToken;
           user.passwordResetExpires = Date.now() + 3600000; // 1 ชั่วโมง
           await user.save();
-
-          // ส่งอีเมลพร้อมลิงก์รีเซ็ตรหัสผ่าน
-          const resetURL = `https://your-app.com/reset-password/${resetToken}`;
-          const transporter = nodemailer.createTransport({
-            service: "Gmail",
-            auth: {
-              user: process.env.EMAIL_USER,
-              pass: process.env.EMAIL_PASS,
-            },
-          });
-
-          await transporter.sendMail({
-            to: email,
-            subject: "Password Reset Request",
-            text: `You requested a password reset. Click the following link to reset your password: ${resetURL}`,
-          });
 
           set.status = 200;
           return { message: "Password reset link sent to your email" };

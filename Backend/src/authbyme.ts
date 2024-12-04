@@ -8,6 +8,7 @@ import User from "../lib/model";
 import dotenv from "dotenv";
 import { set } from "mongoose";
 import swagger from "@elysiajs/swagger";
+import { clients } from "../libsql/connect";
 dotenv.config();
 
 interface RegisterBody {
@@ -131,58 +132,86 @@ export const auth4 = (app: Elysia) =>
       .post(
         "/register",
         async ({ body, set }) => {
-          const { username, password, email } = body;
+          try {
+            const { username, password, email } = body;
 
-          if (!username || !password || !email) {
-            return {
-              error: "All fields (username, password, email) are required",
-            };
-          }
-          // ห้ามไม่ให้ผู้ใช้ป้อนอัขระพิเศษในผู้ใช้
-          const usernameRegex = /^[a-zA-z0-9]+$/;
-          //ตรวจสอบว่าใน username มีอักขระพิเศษหรือไม่ ด้วย .test ถ้ามันมีจะส่งค่าเป็น flase แต่ถ้าไม่มีจะส่งเป็น true
-          if (!usernameRegex.test(username)) {
-            set.status = 400;
-            return {
-              error:
-                "Cannot Username can only contain alphanumeric characters.",
-            };
-          }
-          const passwordRegex = /^(?=(.*[!@#$%^&*]))[a-zA-Z0-9!@#$%^&*]{6,}$/;
+            if (!username || !password || !email) {
+              return {
+                error: "All fields (username, password, email) are required",
+              };
+            }
 
-          if (!passwordRegex.test(password)) {
-            set.status = 400;
-            return {
-              error:
-                "Password must contain at least two special characters (!@#$%^&*) and be at least 6 characters long.",
-            };
-          }
+            // ห้ามไม่ให้ผู้ใช้ป้อนอัขระพิเศษในผู้ใช้
+            const usernameRegex = /^[a-zA-z0-9]+$/;
 
-          const checkemail = await User.findOne({ email });
-          if (checkemail) {
-            set.status = 400;
-            return { error: "Error email already in use" };
-          }
-          const exituser = await User.findOne({ username });
-          if (exituser) {
-            set.status = 400;
-            return { error: "Error username already in use" };
-          }
+            //ตรวจสอบว่าใน username มีอักขระพิเศษหรือไม่ ด้วย .test ถ้ามันมีจะส่งค่าเป็น flase แต่ถ้าไม่มีจะส่งเป็น true
+            if (!usernameRegex.test(username)) {
+              set.status = 400;
+              return {
+                error:
+                  "Cannot Username can only contain alphanumeric characters.",
+              };
+            }
+            const passwordRegex = /^(?=(.*[!@#$%^&*]))[a-zA-Z0-9!@#$%^&*]{6,}$/;
 
-          const hashpass = await bcrypt.hash(password, 10);
+            if (!passwordRegex.test(password)) {
+              set.status = 400;
+              return {
+                error:
+                  "Password must contain at least two special characters (!@#$%^&*) and be at least 6 characters long.",
+              };
+            }
 
-          const user = await User.create({
-            username,
-            email,
-            password: hashpass,
-          });
-          if (!user) {
+            /*  const checkemail = await User.findOne({ email });
+            if (checkemail) {
+              set.status = 400;
+              return { error: "Error email already in use" };
+            }*/
+            await clients.query("BEGIN");
+            const exituser = await clients.query(
+              "SELECT * FROM users WHERE username = $1",
+              [username]
+            );
+            if (exituser.rows.length > 0) {
+              set.status = 409;
+              await clients.query("ROLLBACK");
+              return { error: "Error username already in use" };
+            }
+            const exitemail = await clients.query(
+              "SELECT * FROM users WHERE email = $1",
+              [email]
+            );
+
+            if (exitemail.rows.length > 0) {
+              set.status = 409;
+              await clients.query("ROLLBACK");
+              return { error: "Error username already in use" };
+            }
+
+            const hashpass = await bcrypt.hash(password, 10);
+            const query =
+              "INSERT INTO users (username,password,email) VALUES ($1,$2,$3)";
+            await clients.query(query, [username, hashpass, email]);
+            /*  const user = await User.create({
+              username,
+              email,
+              password: hashpass,
+            });
+            if (!user) {
+              set.status = 500;
+              return { message: "Error not user" };
+            }*/
+
+            // ตรวจสอบอีเมล
+
+            await clients.query("COMMIT");
+            set.status = 201;
+            return { message: "User data received successfully" };
+          } catch (err) {
             set.status = 500;
-            return { message: "Error not user" };
+            await clients.query("ROLLBACK");
+            return { Error: (err as Error).message };
           }
-
-          set.status = 201;
-          return { message: "User data received successfully" };
         },
         {
           body: t.Object({
@@ -214,6 +243,7 @@ export const auth4 = (app: Elysia) =>
               error: "Username can only contain alphanumeric characters.",
             };
           }
+
           const sanitizedUsername = username.trim();
           const sanitizedPassword = password.trim();
 
@@ -307,15 +337,11 @@ export const auth4 = (app: Elysia) =>
           }),
         }
       )
-      .put("/sign-out", ({ set }) => {
+      .put("/sign-out", ({ set, cookie }) => {
         //ทำให้cookieเป็นว่าง
-        const signout = (set.cookie = {
-          auth: {
-            value: "",
-            httpOnly: true,
-            path: "/",
-          },
-        });
+
+        cookie.auth.remove();
+
         set.status = 200;
         return { message: "You Signout Success" };
       });

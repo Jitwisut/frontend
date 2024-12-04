@@ -38,6 +38,25 @@ const redisClient = redis.createClient({
   url: process.env.REDIS_URL || "redis://localhost:6379",
 });
 
+async function getdecoded(cookie: any, jwt: any, set: any) {
+  try {
+    const auth = cookie.auth.value;
+    if (!auth) {
+      set.status = 400;
+      return { error: "Unauthorized" };
+    }
+    const decoded = await jwt.verify(auth);
+    if (typeof decoded !== "object" || decoded === null) {
+      set.status = 401;
+      return { error: "Invalid token" };
+    }
+    return decoded;
+  } catch (error) {
+    set.status = 401;
+    return { error: "Invalid token" };
+  }
+}
+
 redisClient.on("error", (err) => console.log("Redis Client Error", err));
 
 // เชื่อมต่อ Redis
@@ -60,21 +79,12 @@ export const Carts = (app: Elysia) =>
 
       // Middleware สำหรับตรวจสอบ JWT
       .derive(async ({ request, set, jwt, cookie }) => {
-        const auth = cookie.auth.value;
-
-        if (!auth) {
+        try {
+          return { decoded: await getdecoded(cookie, jwt, set) };
+        } catch (error) {
           set.status = 401;
-          return { error: "Unauthorized" };
+          return { Error: (error as Error).message };
         }
-
-        const decoded = await jwt.verify(auth);
-        if (typeof decoded !== "object" || decoded === null) {
-          set.status = 401;
-          return { error: "Invalid token" };
-        }
-
-        set.status = 200;
-        return { decoded };
       })
 
       // เพิ่มสินค้าเข้ารถเข็น
@@ -247,6 +257,7 @@ export const Carts = (app: Elysia) =>
           // 1. ตรวจสอบการยืนยันตัวตน
           if (!decoded) {
             set.status = 401;
+
             return { error: "Unauthorized" };
           }
 
@@ -312,8 +323,9 @@ export const Carts = (app: Elysia) =>
             if (clearCartResult.modifiedCount === 0) {
               throw new Error("Failed to clear cart");
             }
-
-            // 4.3 ยืนยันธุรกรรม PostgreSQL
+            //4.3 ล้างข้อมูลในredis
+            await redisClient.del(`cart:${username}`);
+            // 4.4 ยืนยันธุรกรรม PostgreSQL
             await clients.query("COMMIT");
 
             // 5. ส่งคืนการตอบสนองสำเร็จ
@@ -458,6 +470,18 @@ export const Carts = (app: Elysia) =>
           };
         } catch (err) {
           console.log("Error:", (err as Error).message); // ปรับการแสดง error message ให้ชัดเจน
+        }
+      })
+      .get("/allorder", async ({ set, decoded }) => {
+        try {
+          const order = await clients.query("SELECT COUNT(*) FROM orders");
+          if (!order) {
+            return { message: "NOT FOUND ALLORDER" };
+          }
+          set.status = 200;
+          return { message: "ALLORDER", order: order.rows[0].count }; // ส่งคืนจำนวนทั้งหมดของคำสั่งซื้อในระบบreferto the total number of orders in the system
+        } catch (err) {
+          return { error: (err as Error).message };
         }
       })
   );

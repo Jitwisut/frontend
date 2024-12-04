@@ -169,4 +169,14 @@ export const Profile = (app: Elysia) =>
           return { Error: (err as Error).message };
         }
       })
+      .get("/alluser", async ({ set }) => {
+        try {
+          const users = await User.find({}, { password: 0 }); // ไม่รวม password ในผลลัพธ์
+          const usercount = users.length;
+          set.status = 200; // ตั้งค่าสถานะ HTTP เป็น 200 (OK)
+          return { users, count: usercount }; // ส่งผลลัพธ์กลับไปยังผู้ใช้งาน
+        } catch (err) {
+          return { error: (err as Error).message };
+        }
+      })
   );
